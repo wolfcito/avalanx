@@ -1,5 +1,5 @@
-import { FormEvent, useState } from 'react'
-import { useAccount, useWriteContract , useWaitForTransactionReceipt} from 'wagmi'
+import { FormEvent, useState, useEffect } from 'react'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { erc20Abi } from 'viem'
 import { AVIT_TOKEN_CONTRACT, STAKING_ABI, STAKING_CONTRACT } from '@/src/contracts'
 import { nanoid } from 'nanoid'
@@ -15,69 +15,81 @@ export default function Home() {
   const [amount, setAmount] = useState(0)
   const { address } = useAccount()
   const { writeContractAsync } = useWriteContract()
-  const [txApprove, setTxApprove] = useState<`0x${string}`>('0x')
-  const result = useWaitForTransactionReceipt({ hash: txApprove, confirmations: 2 })
+  
+  // Guardamos el hash de la transacción de approve y el monto pendiente de stake.
+  const [txApproveHash, setTxApproveHash] = useState<`0x${string}` | null>(null)
+  const [pendingStakeAmount, setPendingStakeAmount] = useState<number | null>(null)
 
+  // Hook para esperar la confirmación de la transacción de approve
+  const { data: receipt, isSuccess } = useWaitForTransactionReceipt({
+    hash: txApproveHash ?? '0x',
+    confirmations: 2,
+  })
+
+  // Efecto: Cuando la aprobación se confirme, se ejecuta el stake.
+  useEffect(() => {
+    if (isSuccess && receipt && pendingStakeAmount && address) {
+      (async () => {
+         try {
+            const txStake = await writeContractAsync({
+              abi: STAKING_ABI,
+              address: STAKING_CONTRACT as `0x${string}`,
+              functionName: 'stake',
+              args: [BigInt(pendingStakeAmount)],
+            })
+            console.log(`Successfully staked ${pendingStakeAmount} AIVT from address ${address}`)
+            setHistory(prev => [
+              ...prev,
+              { content: `Successfully staked ${pendingStakeAmount} AIVT from address ${address}`, sender: 'brian' }
+            ])
+            // Limpiar el monto pendiente después de stake
+            setPendingStakeAmount(null)
+         } catch (error) {
+            console.error('Error during staking (after approval): ', error)
+         }
+      })()
+    }
+  }, [isSuccess, receipt, pendingStakeAmount, address, writeContractAsync])
+  
   const handleStake = async (customAmount?: number, userAddress?: string) => {
     const stakeAmount = customAmount ?? amount
 
     if (stakeAmount <= 0 || !userAddress) {
-      console.log(
-        'Please enter a valid staking amount and a valid address'
-      )
+      console.log('Please enter a valid staking amount and a valid address')
       return
     }
 
     try {
-      
+      // Ejecutar aprobación y obtener el hash
       const txApprove = await writeContractAsync({
         abi: erc20Abi,
         address: AVIT_TOKEN_CONTRACT as `0x${string}`,
         functionName: 'approve',
         args: [STAKING_CONTRACT, BigInt(stakeAmount)],
       })
+      // Guardar el hash de la transacción de approve y el monto a stakear
+      setTxApproveHash(txApprove)
+      setPendingStakeAmount(stakeAmount)
       
-      setTxApprove(txApprove)
-     
-      
-      console.log(
-        `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`
-      )
-      console.log('txApprove', txApprove)
-      console.log('result', result)
-      setHistory([
-        ...history,
-        { content: `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`, sender: 'brian' },
+      console.log(`Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`)
+      setHistory(prev => [
+        ...prev,
+        { content: `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`, sender: 'brian' }
       ])
       
-      await writeContractAsync({
-        abi: STAKING_ABI,
-        address: STAKING_CONTRACT as `0x${string}`,
-        functionName: 'stake',
-        args: [BigInt(stakeAmount)],
-      })
-
-      console.log(
-        `Successfully staked ${stakeAmount} AIVT from address ${userAddress}`
-      )
-      setHistory([
-        ...history,
-        { content: `Successfully staked ${stakeAmount} AIVT from address ${userAddress}`, sender: 'brian' },
-      ])
+      // La transacción de stake se ejecutará cuando useWaitForTransactionReceipt confirme el approve.
+      
     } catch (error) {
-      console.error('Error during staking: ', {error})
+      console.error('Error during staking: ', error)
     }
   }
 
   const handleChat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    let messageInput: HTMLInputElement | null = null;
+    let messageInput: HTMLInputElement | null = null
     try {
-      messageInput = (event.target as HTMLFormElement)
-        .elements[0] as HTMLInputElement
+      messageInput = (event.target as HTMLFormElement).elements[0] as HTMLInputElement
       const userMessage = messageInput.value
-
-      
 
       const response = await fetch('https://api.brianknows.org/api/v0/agent', {
         method: 'POST',
@@ -96,11 +108,9 @@ export default function Home() {
       console.log('data', { data })
 
       if (data.error?.includes('tokens in your request are not supported')) {
-        console.warn(
-          'Brian AI does not recognize the token, but we will proceed with staking.'
-        )
+        console.warn('Brian AI does not recognize the token, but we will proceed with staking.')
 
-        setHistory([
+        setHistory(prev => [
           { content: userMessage, sender: 'user' },
           ...data.conversationHistory,
         ])
@@ -111,8 +121,8 @@ export default function Home() {
 
       if (!data.result || data.result.length === 0) {
         console.error('Unexpected response from Brian AI:', data)
-        setHistory([
-          ...history,
+        setHistory(prev => [
+          ...prev,
           { content: userMessage, sender: 'user' },
           { content: 'Did not receive a valid response.', sender: 'brian' },
         ])
@@ -132,29 +142,26 @@ export default function Home() {
       const answer =
         brianResponse.answer ||
         `Staking ${amountToStake} AIVT on Avalanche Fuji (43113).`
-      setHistory([
-        ...history,
+      setHistory(prev => [
+        ...prev,
         { content: userMessage, sender: 'user' },
         { content: answer, sender: 'brian' },
       ])
 
       if (action === 'stake' && amountToStake > 0 && address) {
-        console.log(
-          `Staking ${amountToStake} AIVT on network ${chain} from address ${address}`
-        )
+        console.log(`Staking ${amountToStake} AIVT on network ${chain} from address ${address}`)
         setAmount(amountToStake)
         await handleStake(amountToStake, address)
       }
     } catch (error) {
       console.error('Error in chat:', error)
-      setHistory([
-        ...history,
+      setHistory(prev => [
+        ...prev,
         { content: 'Error fetching response from Brian AI.', sender: 'brian' },
       ])
-    }finally{
-      if (messageInput) messageInput.value = '';
+    } finally {
+      if (messageInput) messageInput.value = ''
     }
-
   }
 
   return (
