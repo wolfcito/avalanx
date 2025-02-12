@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react'
-import { useAccount, useWriteContract } from 'wagmi'
+import { useAccount, useWriteContract , useWaitForTransactionReceipt} from 'wagmi'
 import { erc20Abi } from 'viem'
-import { AVIT_CONTRACT, STAKING_ABI, STAKING_CONTRACT } from '@/src/contracts'
+import { AVIT_TOKEN_CONTRACT, STAKING_ABI, STAKING_CONTRACT } from '@/src/contracts'
 import { nanoid } from 'nanoid'
 import dotenv from 'dotenv'
 import ReactMarkdown from 'react-markdown'
@@ -15,58 +15,69 @@ export default function Home() {
   const [amount, setAmount] = useState(0)
   const { address } = useAccount()
   const { writeContractAsync } = useWriteContract()
+  const [txApprove, setTxApprove] = useState<`0x${string}`>('0x')
+  const result = useWaitForTransactionReceipt({ hash: txApprove, confirmations: 2 })
 
   const handleStake = async (customAmount?: number, userAddress?: string) => {
     const stakeAmount = customAmount ?? amount
 
     if (stakeAmount <= 0 || !userAddress) {
       console.log(
-        'Debe ingresar un monto válido para stake y tener una dirección válida'
+        'Please enter a valid staking amount and a valid address'
       )
       return
     }
 
     try {
-      const dataApprove = {
+      
+      const txApprove = await writeContractAsync({
         abi: erc20Abi,
-        address: AVIT_CONTRACT as `0x${string}`,
+        address: AVIT_TOKEN_CONTRACT as `0x${string}`,
         functionName: 'approve',
         args: [STAKING_CONTRACT, BigInt(stakeAmount)],
-        from: userAddress,
-      } as const
-      await writeContractAsync(dataApprove)
-
-      const dataStake = {
+      })
+      
+      setTxApprove(txApprove)
+     
+      
+      console.log(
+        `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`
+      )
+      console.log('txApprove', txApprove)
+      console.log('result', result)
+      setHistory([
+        ...history,
+        { content: `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`, sender: 'brian' },
+      ])
+      
+      await writeContractAsync({
         abi: STAKING_ABI,
         address: STAKING_CONTRACT as `0x${string}`,
         functionName: 'stake',
         args: [BigInt(stakeAmount)],
-        from: userAddress,
-      }
-      await writeContractAsync(dataStake)
+      })
 
       console.log(
-        `Staking de ${stakeAmount} AIVT realizado con éxito desde ${userAddress}`
+        `Successfully staked ${stakeAmount} AIVT from address ${userAddress}`
       )
+      setHistory([
+        ...history,
+        { content: `Successfully staked ${stakeAmount} AIVT from address ${userAddress}`, sender: 'brian' },
+      ])
     } catch (error) {
-      console.error('Error en staking: ', error)
+      console.error('Error during staking: ', {error})
     }
   }
 
   const handleChat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    let messageInput: HTMLInputElement | null = null;
     try {
-      const messageInput = (event.target as HTMLFormElement)
+      messageInput = (event.target as HTMLFormElement)
         .elements[0] as HTMLInputElement
       const userMessage = messageInput.value
 
-      const requestBody = {
-        prompt: `${userMessage} on avalanche`,
-        address: address ?? '',
-        messages: history,
-        chain: '43113',
-        tokenContract: AVIT_CONTRACT,
-      }
+      
 
       const response = await fetch('https://api.brianknows.org/api/v0/agent', {
         method: 'POST',
@@ -74,7 +85,11 @@ export default function Home() {
           'X-Brian-Api-Key': process.env.NEXT_PUBLIC_BRIAN_API_KEY as string,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          prompt: `${userMessage} on avalanche`,
+          address: address,
+          messages: history,
+        }),
       })
 
       const data = await response.json()
@@ -82,36 +97,33 @@ export default function Home() {
 
       if (data.error?.includes('tokens in your request are not supported')) {
         console.warn(
-          'Brian AI no reconoce el token, pero procederemos con el staking.'
+          'Brian AI does not recognize the token, but we will proceed with staking.'
         )
 
         setHistory([
-          ...history,
           { content: userMessage, sender: 'user' },
-          {
-            content: `No se pudo validar AIVT en Brian AI, ejecutando staking en Avalanche Fuji (43113).`,
-            sender: 'brian',
-          },
+          ...data.conversationHistory,
         ])
 
-        await handleStake(100, address)
+        await handleStake(data.extractedParams[0].amount, address)
         return
       }
 
       if (!data.result || data.result.length === 0) {
-        console.error('Respuesta inesperada de Brian AI:', data)
+        console.error('Unexpected response from Brian AI:', data)
         setHistory([
           ...history,
           { content: userMessage, sender: 'user' },
-          { content: 'No se recibió una respuesta válida.', sender: 'brian' },
+          { content: 'Did not receive a valid response.', sender: 'brian' },
         ])
         return
       }
 
       const brianResponse = data.result[0]
+      console.log('brianResponse', brianResponse)
       let action = brianResponse.action || ''
       const amountToStake = parseFloat(brianResponse.amount) || 0
-      const chain = '43113' //
+      const chain = '43113'
 
       if (action === 'deposit') {
         action = 'stake'
@@ -119,7 +131,7 @@ export default function Home() {
 
       const answer =
         brianResponse.answer ||
-        `Realizando staking de ${amountToStake} AIVT en Avalanche Fuji (43113).`
+        `Staking ${amountToStake} AIVT on Avalanche Fuji (43113).`
       setHistory([
         ...history,
         { content: userMessage, sender: 'user' },
@@ -128,32 +140,35 @@ export default function Home() {
 
       if (action === 'stake' && amountToStake > 0 && address) {
         console.log(
-          `Realizando staking de ${amountToStake} AIVT en la red ${chain} desde la dirección ${address}`
+          `Staking ${amountToStake} AIVT on network ${chain} from address ${address}`
         )
         setAmount(amountToStake)
         await handleStake(amountToStake, address)
       }
     } catch (error) {
-      console.error('Error en chat:', error)
+      console.error('Error in chat:', error)
       setHistory([
         ...history,
-        { content: 'Error al obtener respuesta de Brian AI.', sender: 'brian' },
+        { content: 'Error fetching response from Brian AI.', sender: 'brian' },
       ])
+    }finally{
+      if (messageInput) messageInput.value = '';
     }
+
   }
 
   return (
     <main className="flex justify-center items-center min-h-screen text-gray-800">
-      <div className="py-8 w-full max-w-lg">
-        <div className="flex justify-end pb-8">
+      <div className="py-8 w-full max-w-lg min-h-screen">
+        <div className="flex justify-end pb-8 bg-white/30 backdrop-blur-md fixed top-0 w-full max-w-lg pt-4">
           <CustomConnectButton />
         </div>
 
-        <div className="h-64 overflow-y-auto rounded-sm">
-          <div className="flex">
+        <div className="overflow-y-auto rounded-sm h-full mt-8">
+          <div className="flex mt-8">
             <div className="w-full">
-              <div className="font-bold pl-2">What can do this bot?</div>
-              <div className="pl-2">
+              <div className="font-bold pl-2">What can this bot do?</div>
+              <div className="pl-2 text-sm">
                 Avalanx is a cyberpunk-inspired AI assistant designed to help
                 users navigate the Avalanche ecosystem. It provides insights on
                 staking, Subnets, HyperSDK, DeFi applications, and network
@@ -174,7 +189,7 @@ export default function Home() {
               key={nanoid()}
               className={
                 el.sender === 'brian'
-                  ? 'text-left bg-gray-100 p-2 rounded-sm'
+                  ? 'text-left bg-gray-100 p-2 rounded-sm mb-20'
                   : 'text-right p-2 rounded-sm'
               }
             >
@@ -183,8 +198,8 @@ export default function Home() {
           ))}
         </div>
 
-        <form onSubmit={handleChat}>
-          <div className="flex items-center mt-8 space-x-1">
+        <form onSubmit={handleChat} className="relative max-w-lg">
+          <div className="flex items-center mt-8 space-x-1 fixed bottom-0 w-full max-w-lg bg-white/30 backdrop-blur-md py-8">
             <input
               type="text"
               placeholder="Ask Avalanx"
