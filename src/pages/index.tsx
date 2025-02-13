@@ -14,6 +14,7 @@ import { nanoid } from 'nanoid'
 import dotenv from 'dotenv'
 import ReactMarkdown from 'react-markdown'
 import { CustomConnectButton } from '@/src/components'
+import clsx from 'clsx'
 
 dotenv.config()
 
@@ -165,46 +166,59 @@ export default function Home() {
       const data = await response.json()
       console.log('data', { data })
 
-      if (
-        data.error &&
-        String(data.error).includes('tokens in your request are not supported')
-      ) {
-        console.warn(
-          'Brian AI does not recognize the token, but we will proceed with staking.'
-        )
-
-        const brianResponse = data.extractedParams[0]
-        console.log('brianResponse', brianResponse)
-        let action = brianResponse.action || ''
-        const amountToStake = parseFloat(brianResponse.amount) || 0
-
+      if (data.error) {
         if (
-          action === 'deposit' &&
-          brianResponse.token1.toUpperCase() === 'AIVT'
-        ) {
-          action = STAKING_FUNCTION_NAME
-        }
-
-        if (action === STAKING_FUNCTION_NAME) {
-          const answer =
-            brianResponse.answer ||
-            `Staking ${amountToStake} ${brianResponse.token1} on ${brianResponse.chain}.`
-          setHistory((prev) => [
-            ...prev,
-            { content: userMessage, sender: 'user' },
-            { content: answer, sender: 'brian' },
-          ])
-        }
-
-        if (action === STAKING_FUNCTION_NAME && amountToStake > 0 && address) {
-          console.log(
-            `Staking ${amountToStake} AIVT on network ${brianResponse.chain} from address ${address}`
+          String(data.error).includes(
+            'tokens in your request are not supported'
           )
-          stakeRequired = true
-          setAmount(amountToStake)
-          await handleStake(amountToStake, address)
-          return
+        ) {
+          console.warn(
+            'Brian AI does not recognize the token, but we will proceed with staking.'
+          )
+
+          const brianResponse = data.extractedParams[0]
+          console.log('brianResponse', brianResponse)
+          let action = brianResponse.action || ''
+          const amountToStake = parseFloat(brianResponse.amount) || 0
+
+          if (
+            action === 'deposit' &&
+            brianResponse.token1.toUpperCase() === 'AIVT'
+          ) {
+            action = STAKING_FUNCTION_NAME
+          }
+
+          if (action === STAKING_FUNCTION_NAME) {
+            const answer =
+              brianResponse.answer ||
+              `Staking ${amountToStake} ${brianResponse.token1} on ${brianResponse.chain}.`
+            setHistory((prev) => [
+              ...prev,
+              { content: userMessage, sender: 'user' },
+              { content: answer, sender: 'brian' },
+            ])
+          }
+
+          if (
+            action === STAKING_FUNCTION_NAME &&
+            amountToStake > 0 &&
+            address
+          ) {
+            console.log(
+              `Staking ${amountToStake} AIVT on network ${brianResponse.chain} from address ${address}`
+            )
+            stakeRequired = true
+            setAmount(amountToStake)
+            await handleStake(amountToStake, address)
+            return
+          }
         }
+        setHistory((prev) => [
+          ...prev,
+          { content: userMessage, sender: 'user' },
+          { content: data.error, sender: 'brian' },
+        ])
+        return
       }
 
       if (data.result[0].answer) {
@@ -314,7 +328,7 @@ export default function Home() {
                     className={`rounded-lg p-3 max-w-xs break-words ${
                       isBot
                         ? 'bg-gray-100 text-gray-900'
-                        : 'bg-red-500 text-white'
+                        : 'bg-red-200 text-gray-900'
                     }`}
                   >
                     <ReactMarkdown>{el.content}</ReactMarkdown>
@@ -344,7 +358,10 @@ export default function Home() {
           <button
             type="submit"
             disabled={isLoading}
-            className="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+            className={clsx(
+              'bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-md',
+              { 'cursor-not-allowed bg-gray-500': isLoading }
+            )}
           >
             {isLoading ? 'working...' : 'send'}
           </button>
