@@ -19,7 +19,7 @@ dotenv.config()
 
 const AI_AGENT_API = process.env.NEXT_PUBLIC_AI_AGENT_API as string
 const STAKING_FUNCTION_NAME = 'AddToken'
-const TOKEN_DECIMALS = 18 
+const TOKEN_DECIMALS = 18
 
 export default function Home() {
   const [history, setHistory] = useState<Message[]>([])
@@ -27,27 +27,23 @@ export default function Home() {
   const { address } = useAccount()
   const { writeContractAsync } = useWriteContract()
 
-  
   const [isLoading, setIsLoading] = useState(false)
 
-  
   const [txApproveHash, setTxApproveHash] = useState<`0x${string}` | null>(null)
-  
+
   const [pendingStakeAmountDisplay, setPendingStakeAmountDisplay] = useState<
     number | null
   >(null)
-  
+
   const [pendingStakeAmountUnits, setPendingStakeAmountUnits] = useState<
     bigint | null
   >(null)
 
-  
   const { data: receipt, isSuccess } = useWaitForTransactionReceipt({
     hash: txApproveHash ?? '0x',
     confirmations: 2,
   })
 
-  
   useEffect(() => {
     let isMounted = true
 
@@ -71,7 +67,7 @@ export default function Home() {
               sender: 'brian',
             },
           ])
-          
+
           setPendingStakeAmountDisplay(null)
           setPendingStakeAmountUnits(null)
           setIsLoading(false)
@@ -98,17 +94,14 @@ export default function Home() {
     }
   }, [isSuccess, receipt, pendingStakeAmountUnits, address, writeContractAsync])
 
-  
   const convertToUnits = (
     amount: number,
     decimals: number = TOKEN_DECIMALS
   ): bigint => {
-    
     return BigInt(Math.floor(amount * Math.pow(10, decimals)))
   }
 
   const handleStake = async (customAmount?: number, userAddress?: string) => {
-    
     const stakeAmount = Number(customAmount ?? amount)
 
     if (isNaN(stakeAmount) || stakeAmount <= 0 || !userAddress) {
@@ -128,7 +121,6 @@ export default function Home() {
     }
 
     try {
-      
       const txApprove = await writeContractAsync({
         abi: erc20Abi,
         address: AVIT_TOKEN_CONTRACT as `0x${string}`,
@@ -136,14 +128,13 @@ export default function Home() {
         args: [STAKING_CONTRACT, stakeAmountInUnits],
       })
       setTxApproveHash(txApprove)
-      
+
       setPendingStakeAmountDisplay(stakeAmount)
       setPendingStakeAmountUnits(stakeAmountInUnits)
 
       const successMsg = `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`
       console.log(successMsg)
       setHistory((prev) => [...prev, { content: successMsg, sender: 'brian' }])
-      
     } catch (error) {
       const errorMsg = `Error during staking: ${error}`
       console.error(errorMsg)
@@ -224,7 +215,6 @@ export default function Home() {
       }
 
       setHistory(data.result[0].conversationHistory)
-      
     } catch (error) {
       console.error('Error in chat:', error)
       setHistory((prev) => [
