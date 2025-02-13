@@ -25,6 +25,9 @@ export default function Home() {
   const { address } = useAccount()
   const { writeContractAsync } = useWriteContract()
 
+  // Estado para manejar el loading del botón
+  const [isLoading, setIsLoading] = useState(false)
+
   // Guardamos el hash de la transacción de approve y el monto pendiente de stake.
   const [txApproveHash, setTxApproveHash] = useState<`0x${string}` | null>(null)
   const [pendingStakeAmount, setPendingStakeAmount] = useState<number | null>(
@@ -39,19 +42,21 @@ export default function Home() {
 
   // Efecto: Cuando la aprobación se confirme, se ejecuta el stake.
   useEffect(() => {
-    if (isSuccess && receipt && pendingStakeAmount && address) {
-      ;(async () => {
-        try {
-          const txStake = await writeContractAsync({
-            abi: STAKING_ABI,
-            address: STAKING_CONTRACT as `0x${string}`,
-            functionName: STAKING_FUNCTION_NAME,
-            args: [BigInt(pendingStakeAmount)],
-          })
+    let isMounted = true
+  
+    const executeStake = async () => {
+      try {
+        const txStake = await writeContractAsync({
+          abi: STAKING_ABI,
+          address: STAKING_CONTRACT as `0x${string}`,
+          functionName: STAKING_FUNCTION_NAME,
+          args: [BigInt(pendingStakeAmount!)],
+        })
+        if (isMounted) {
           console.log(
             `Successfully staked ${pendingStakeAmount} AIVT from address ${address}`
           )
-          setHistory((prev) => [
+          setHistory(prev => [
             ...prev,
             {
               content: `Successfully staked ${pendingStakeAmount} AIVT from address ${address}`,
@@ -60,12 +65,23 @@ export default function Home() {
           ])
           // Limpiar el monto pendiente después de stake
           setPendingStakeAmount(null)
-        } catch (error) {
+        }
+      } catch (error) {
+        if (isMounted) {
           console.error('Error during staking (after approval): ', error)
         }
-      })()
+      }
+    }
+  
+    if (isSuccess && receipt && pendingStakeAmount && address) {
+      executeStake()
+    }
+  
+    return () => {
+      isMounted = false
     }
   }, [isSuccess, receipt, pendingStakeAmount, address, writeContractAsync])
+  
 
   const handleStake = async (customAmount?: number, userAddress?: string) => {
     const stakeAmount = customAmount ?? amount
@@ -106,6 +122,8 @@ export default function Home() {
 
   const handleChat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    // Activar el loading para evitar múltiples envíos
+    setIsLoading(true)
     let messageInput: HTMLInputElement | null = null
     try {
       messageInput = (event.target as HTMLFormElement)
@@ -186,6 +204,8 @@ export default function Home() {
       ])
     } finally {
       if (messageInput) messageInput.value = ''
+      // Desactivar el loading una vez se haya completado el proceso
+      setIsLoading(false)
     }
   }
 
@@ -193,30 +213,11 @@ export default function Home() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-800">
       <div className="bg-white shadow-md rounded-md w-full max-w-md h-screen p-4 flex flex-col">
         <div className="flex justify-end pb-8 bg-white/30 backdrop-blur-md w-full pt-4">
-        <div>What's Avalanx</div>
+          <div>What's Avalanx</div>
           <CustomConnectButton />
         </div>
 
         <div className="overflow-y-auto rounded-sm h-full mt-8">
-          {/* <div className="flex mt-8">
-            <div className="w-full">
-              <div className="font-bold pl-2">What can this bot do?</div>
-              <div className="pl-2 text-sm">
-                Avalanx is a cyberpunk-inspired AI assistant designed to help
-                users navigate the Avalanche ecosystem. It provides insights on
-                staking, Subnets, HyperSDK, DeFi applications, and network
-                performance. With real-time data and expert guidance, Avalanx
-                simplifies Web3 engagement and blockchain development.
-              </div>
-            </div>
-            <div className="w-80">
-              <img
-                src="https://res.cloudinary.com/guffenix/image/upload/f_auto,q_auto/v1/avalanx/avatar"
-                alt="Avalanx"
-                className="rounded-sm"
-              />
-            </div>
-          </div> */}
           <div className="flex flex-col space-y-4 p-4 overflow-y-auto h-96">
             {history.map((el) => {
               const isBot = el.sender === 'brian'
@@ -265,9 +266,10 @@ export default function Home() {
           />
           <button
             type="submit"
+            disabled={isLoading}
             className="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-md"
           >
-            Send
+            {isLoading ? 'Enviando...' : 'Send'}
           </button>
         </form>
       </div>
