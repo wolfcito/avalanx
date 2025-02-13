@@ -18,6 +18,7 @@ import { CustomConnectButton } from '@/src/components'
 dotenv.config()
 
 const AI_AGENT_API = process.env.NEXT_PUBLIC_AI_AGENT_API as string
+const STAKING_AVAX_FUNCTION_NAME = 'AddAvax'
 const STAKING_FUNCTION_NAME = 'AddToken'
 const TOKEN_DECIMALS = 18
 
@@ -28,13 +29,10 @@ export default function Home() {
   const { writeContractAsync } = useWriteContract()
 
   const [isLoading, setIsLoading] = useState(false)
-
   const [txApproveHash, setTxApproveHash] = useState<`0x${string}` | null>(null)
-
   const [pendingStakeAmountDisplay, setPendingStakeAmountDisplay] = useState<
     number | null
   >(null)
-
   const [pendingStakeAmountUnits, setPendingStakeAmountUnits] = useState<
     bigint | null
   >(null)
@@ -67,7 +65,6 @@ export default function Home() {
               sender: 'brian',
             },
           ])
-
           setPendingStakeAmountDisplay(null)
           setPendingStakeAmountUnits(null)
           setIsLoading(false)
@@ -128,7 +125,6 @@ export default function Home() {
         args: [STAKING_CONTRACT, stakeAmountInUnits],
       })
       setTxApproveHash(txApprove)
-
       setPendingStakeAmountDisplay(stakeAmount)
       setPendingStakeAmountUnits(stakeAmountInUnits)
 
@@ -175,7 +171,6 @@ export default function Home() {
         )
 
         const brianResponse = data.extractedParams[0]
-
         console.log('brianResponse', brianResponse)
         let action = brianResponse.action || ''
         const amountToStake = parseFloat(brianResponse.amount) || 0
@@ -205,16 +200,67 @@ export default function Home() {
           stakeRequired = true
           setAmount(amountToStake)
           await handleStake(amountToStake, address)
-          // No desactivamos el loading acá; se hará en el useEffect tras el stake
           return
         }
-
-        // stakeRequired = true
-        // await handleStake(data.extractedParams[0].amount, address)
-        // return
       }
 
       setHistory(data.result[0].conversationHistory)
+
+      const brianResponse = data.result[0].extractedParams
+      let action = data.result[0].action || ''
+      const amountToStake = parseFloat(brianResponse.amount) || 0
+
+      if (
+        action === 'deposit' &&
+        brianResponse.token1.toLowerCase() === 'avax'
+      ) {
+        action = STAKING_AVAX_FUNCTION_NAME
+      }
+
+      if (
+        action === STAKING_AVAX_FUNCTION_NAME &&
+        amountToStake > 0 &&
+        address
+      ) {
+        const answer =
+          brianResponse.answer ||
+          `Staking ${amountToStake} AVAX on ${brianResponse.chain}.`
+        setHistory((prev) => [
+          ...prev,
+          { content: `User: ${userMessage}`, sender: 'user' },
+          { content: answer, sender: 'brian' },
+        ])
+
+        const stakeAmountInUnits = convertToUnits(amountToStake)
+        try {
+          const txStakeAvax = await writeContractAsync({
+            abi: STAKING_ABI,
+            address: STAKING_CONTRACT as `0x${string}`,
+            functionName: STAKING_AVAX_FUNCTION_NAME,
+            value: stakeAmountInUnits,
+          })
+          console.log(
+            `Successfully staked ${amountToStake} AVAX on network ${brianResponse.chain} from address ${address}, tx: ${txStakeAvax}`
+          )
+          setHistory((prev) => [
+            ...prev,
+            {
+              content: `Successfully staked ${amountToStake} AVAX from address ${address} tx: ${txStakeAvax}`,
+              sender: 'brian',
+            },
+          ])
+          stakeRequired = true
+          return
+        } catch (error) {
+          const errorMsg = `Error during AVAX staking: ${error}`
+          console.error(errorMsg)
+          setHistory((prev) => [
+            ...prev,
+            { content: errorMsg, sender: 'brian' },
+          ])
+          return
+        }
+      }
     } catch (error) {
       console.error('Error in chat:', error)
       setHistory((prev) => [
