@@ -165,7 +165,10 @@ export default function Home() {
       const data = await response.json()
       console.log('data', { data })
 
-      if (data.error?.includes('tokens in your request are not supported')) {
+      if (
+        data.error &&
+        String(data.error).includes('tokens in your request are not supported')
+      ) {
         console.warn(
           'Brian AI does not recognize the token, but we will proceed with staking.'
         )
@@ -204,7 +207,13 @@ export default function Home() {
         }
       }
 
-      setHistory(data.result[0].conversationHistory)
+      if (data.result[0].answer) {
+        setHistory((prev) => [
+          ...prev,
+          { content: userMessage, sender: 'user' },
+          { content: data.result[0].answer, sender: 'brian' },
+        ])
+      }
 
       const brianResponse = data.result[0].extractedParams
       let action = data.result[0].action || ''
@@ -227,7 +236,7 @@ export default function Home() {
           `Staking ${amountToStake} AVAX on ${brianResponse.chain}.`
         setHistory((prev) => [
           ...prev,
-          { content: `User: ${userMessage}`, sender: 'user' },
+          { content: `${userMessage}`, sender: 'user' },
           { content: answer, sender: 'brian' },
         ])
 
@@ -249,6 +258,7 @@ export default function Home() {
               sender: 'brian',
             },
           ])
+          setIsLoading(false)
           stakeRequired = true
           return
         } catch (error) {
@@ -258,6 +268,7 @@ export default function Home() {
             ...prev,
             { content: errorMsg, sender: 'brian' },
           ])
+          setIsLoading(false)
           return
         }
       }
