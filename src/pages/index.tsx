@@ -17,7 +17,9 @@ import { CustomConnectButton } from '@/src/components'
 
 dotenv.config()
 
+const AI_AGENT_API = process.env.NEXT_PUBLIC_AI_AGENT_API as string
 const STAKING_FUNCTION_NAME = 'AddToken'
+const TOKEN_DECIMALS = 18 
 
 export default function Home() {
   const [history, setHistory] = useState<Message[]>([])
@@ -25,102 +27,127 @@ export default function Home() {
   const { address } = useAccount()
   const { writeContractAsync } = useWriteContract()
 
-  // Estado para manejar el loading del botón
+  
   const [isLoading, setIsLoading] = useState(false)
 
-  // Guardamos el hash de la transacción de approve y el monto pendiente de stake.
+  
   const [txApproveHash, setTxApproveHash] = useState<`0x${string}` | null>(null)
-  const [pendingStakeAmount, setPendingStakeAmount] = useState<number | null>(
-    null
-  )
+  
+  const [pendingStakeAmountDisplay, setPendingStakeAmountDisplay] = useState<
+    number | null
+  >(null)
+  
+  const [pendingStakeAmountUnits, setPendingStakeAmountUnits] = useState<
+    bigint | null
+  >(null)
 
-  // Hook para esperar la confirmación de la transacción de approve
+  
   const { data: receipt, isSuccess } = useWaitForTransactionReceipt({
     hash: txApproveHash ?? '0x',
     confirmations: 2,
   })
 
-  // Efecto: Cuando la aprobación se confirme, se ejecuta el stake.
+  
   useEffect(() => {
     let isMounted = true
-  
+
     const executeStake = async () => {
       try {
         const txStake = await writeContractAsync({
           abi: STAKING_ABI,
           address: STAKING_CONTRACT as `0x${string}`,
           functionName: STAKING_FUNCTION_NAME,
-          args: [BigInt(pendingStakeAmount!)],
+          args: [pendingStakeAmountUnits!],
         })
-  
+
         if (isMounted) {
           console.log(
-            `Successfully staked ${pendingStakeAmount} AIVT from address ${address}`
+            `Successfully staked ${pendingStakeAmountDisplay} AIVT from address ${address}`
           )
           setHistory((prev) => [
             ...prev,
             {
-              content: `Successfully staked ${pendingStakeAmount} AIVT from address ${address}`,
+              content: `Successfully staked ${pendingStakeAmountDisplay} AIVT from address ${address} hash: ${txStake}`,
               sender: 'brian',
             },
           ])
-          // Limpiar el monto pendiente después de stake y desactivar el loading
-          setPendingStakeAmount(null)
+          
+          setPendingStakeAmountDisplay(null)
+          setPendingStakeAmountUnits(null)
           setIsLoading(false)
         }
       } catch (error) {
         if (isMounted) {
-          console.error('Error during staking (after approval): ', error)
+          const errorMsg = `Error during staking (after approval): ${error}`
+          console.error(errorMsg)
+          setHistory((prev) => [
+            ...prev,
+            { content: errorMsg, sender: 'brian' },
+          ])
           setIsLoading(false)
         }
       }
     }
-  
-    if (isSuccess && receipt && pendingStakeAmount && address) {
+
+    if (isSuccess && receipt && pendingStakeAmountUnits && address) {
       executeStake()
     }
-  
+
     return () => {
       isMounted = false
     }
-  }, [isSuccess, receipt, pendingStakeAmount, address, writeContractAsync])
+  }, [isSuccess, receipt, pendingStakeAmountUnits, address, writeContractAsync])
+
   
-  
+  const convertToUnits = (
+    amount: number,
+    decimals: number = TOKEN_DECIMALS
+  ): bigint => {
+    
+    return BigInt(Math.floor(amount * Math.pow(10, decimals)))
+  }
 
   const handleStake = async (customAmount?: number, userAddress?: string) => {
-    const stakeAmount = customAmount ?? amount
+    
+    const stakeAmount = Number(customAmount ?? amount)
 
-    if (stakeAmount <= 0 || !userAddress) {
-      console.log('Please enter a valid staking amount and a valid address')
+    if (isNaN(stakeAmount) || stakeAmount <= 0 || !userAddress) {
+      const errorMsg =
+        'Ingrese un monto de staking válido y una dirección válida'
+      console.error(errorMsg)
+      setHistory((prev) => [...prev, { content: errorMsg, sender: 'brian' }])
+      return
+    }
+
+    const stakeAmountInUnits = convertToUnits(stakeAmount)
+    if (stakeAmountInUnits === BigInt(0)) {
+      const errorMsg = `El monto ingresado es muy bajo.`
+      console.error(errorMsg)
+      setHistory((prev) => [...prev, { content: errorMsg, sender: 'brian' }])
       return
     }
 
     try {
-      // Ejecutar aprobación y obtener el hash
+      
       const txApprove = await writeContractAsync({
         abi: erc20Abi,
         address: AVIT_TOKEN_CONTRACT as `0x${string}`,
         functionName: 'approve',
-        args: [STAKING_CONTRACT, BigInt(stakeAmount)],
+        args: [STAKING_CONTRACT, stakeAmountInUnits],
       })
-      // Guardar el hash de la transacción de approve y el monto a stakear
       setTxApproveHash(txApprove)
-      setPendingStakeAmount(stakeAmount)
+      
+      setPendingStakeAmountDisplay(stakeAmount)
+      setPendingStakeAmountUnits(stakeAmountInUnits)
 
-      console.log(
-        `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`
-      )
-      setHistory((prev) => [
-        ...prev,
-        {
-          content: `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`,
-          sender: 'brian',
-        },
-      ])
-
-      // La transacción de stake se ejecutará cuando useWaitForTransactionReceipt confirme el approve.
+      const successMsg = `Successfully approved ${stakeAmount} AIVT to be staked from address ${userAddress}`
+      console.log(successMsg)
+      setHistory((prev) => [...prev, { content: successMsg, sender: 'brian' }])
+      
     } catch (error) {
-      console.error('Error during staking: ', error)
+      const errorMsg = `Error during staking: ${error}`
+      console.error(errorMsg)
+      setHistory((prev) => [...prev, { content: errorMsg, sender: 'brian' }])
     }
   }
 
@@ -129,14 +156,13 @@ export default function Home() {
     setIsLoading(true)
     let stakeRequired = false
     let messageInput: HTMLInputElement | null = null
-    // let amountToStakeLocal = 0
-  
+
     try {
       messageInput = (event.target as HTMLFormElement)
         .elements[0] as HTMLInputElement
       const userMessage = messageInput.value
-  
-      const response = await fetch('https://api.brianknows.org/api/v0/agent', {
+
+      const response = await fetch(AI_AGENT_API, {
         method: 'POST',
         headers: {
           'X-Brian-Api-Key': process.env.NEXT_PUBLIC_BRIAN_API_KEY as string,
@@ -148,80 +174,70 @@ export default function Home() {
           messages: history,
         }),
       })
-  
+
       const data = await response.json()
       console.log('data', { data })
-  
+
       if (data.error?.includes('tokens in your request are not supported')) {
         console.warn(
           'Brian AI does not recognize the token, but we will proceed with staking.'
         )
-  
-        setHistory((prev) => [
-          { content: userMessage, sender: 'user' },
-          ...data.conversationHistory,
-        ])
-  
-        // En este caso se ejecuta el staking, por lo que se debe mantener el loading
-        stakeRequired = true
-        await handleStake(data.extractedParams[0].amount, address)
-        return
+
+        const brianResponse = data.extractedParams[0]
+
+        console.log('brianResponse', brianResponse)
+        let action = brianResponse.action || ''
+        const amountToStake = parseFloat(brianResponse.amount) || 0
+
+        if (
+          action === 'deposit' &&
+          brianResponse.token1.toUpperCase() === 'AIVT'
+        ) {
+          action = STAKING_FUNCTION_NAME
+        }
+
+        if (action === STAKING_FUNCTION_NAME) {
+          const answer =
+            brianResponse.answer ||
+            `Staking ${amountToStake} ${brianResponse.token1} on ${brianResponse.chain}.`
+          setHistory((prev) => [
+            ...prev,
+            { content: userMessage, sender: 'user' },
+            { content: answer, sender: 'brian' },
+          ])
+        }
+
+        if (action === STAKING_FUNCTION_NAME && amountToStake > 0 && address) {
+          console.log(
+            `Staking ${amountToStake} AIVT on network ${brianResponse.chain} from address ${address}`
+          )
+          stakeRequired = true
+          setAmount(amountToStake)
+          await handleStake(amountToStake, address)
+          // No desactivamos el loading acá; se hará en el useEffect tras el stake
+          return
+        }
+
+        // stakeRequired = true
+        // await handleStake(data.extractedParams[0].amount, address)
+        // return
       }
-  
-      if (!data.result || data.result.length === 0) {
-        console.error('Unexpected response from Brian AI:', data)
-        setHistory((prev) => [
-          ...prev,
-          { content: userMessage, sender: 'user' },
-          { content: 'Did not receive a valid response.', sender: 'brian' },
-        ])
-        return
-      }
-  
-      const brianResponse = data.result[0]
-      console.log('brianResponse', brianResponse)
-      let action = brianResponse.action || ''
-      const amountToStake = parseFloat(brianResponse.amount) || 0
-      const chain = '43113'
-  
-      if (action === 'deposit') {
-        action = STAKING_FUNCTION_NAME
-      }
-  
-      const answer =
-        brianResponse.answer ||
-        `Staking ${amountToStake} AIVT on Avalanche Fuji (43113).`
-      setHistory((prev) => [
-        ...prev,
-        { content: userMessage, sender: 'user' },
-        { content: answer, sender: 'brian' },
-      ])
-  
-      if (action === STAKING_FUNCTION_NAME && amountToStake > 0 && address) {
-        console.log(
-          `Staking ${amountToStake} AIVT on network ${chain} from address ${address}`
-        )
-        stakeRequired = true
-        setAmount(amountToStake)
-        await handleStake(amountToStake, address)
-        // No se desactiva isLoading aquí; se espera a que useEffect lo haga
-        return
-      }
+
+      setHistory(data.result[0].conversationHistory)
+      
     } catch (error) {
       console.error('Error in chat:', error)
       setHistory((prev) => [
         ...prev,
-        { content: 'Error fetching response from Brian AI.', sender: 'brian' },
+        { content: 'Your request could not be processed', sender: 'brian' },
       ])
     } finally {
       if (messageInput) messageInput.value = ''
-      // Solo se desactiva el loading aquí si no se requiere stake (es decir, la transacción ya terminó)
       if (!stakeRequired) {
         setIsLoading(false)
       }
     }
   }
-  
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-800">
@@ -251,7 +267,7 @@ export default function Home() {
                     className={`rounded-lg p-3 max-w-xs break-words ${
                       isBot
                         ? 'bg-gray-100 text-gray-900'
-                        : 'bg-red-300 text-gray-900'
+                        : 'bg-red-500 text-white'
                     }`}
                   >
                     <ReactMarkdown>{el.content}</ReactMarkdown>
@@ -283,7 +299,7 @@ export default function Home() {
             disabled={isLoading}
             className="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-md"
           >
-            {isLoading ? 'transacting...' : 'send'}
+            {isLoading ? 'working...' : 'send'}
           </button>
         </form>
       </div>
