@@ -52,23 +52,26 @@ export default function Home() {
           functionName: STAKING_FUNCTION_NAME,
           args: [BigInt(pendingStakeAmount!)],
         })
+  
         if (isMounted) {
           console.log(
             `Successfully staked ${pendingStakeAmount} AIVT from address ${address}`
           )
-          setHistory(prev => [
+          setHistory((prev) => [
             ...prev,
             {
               content: `Successfully staked ${pendingStakeAmount} AIVT from address ${address}`,
               sender: 'brian',
             },
           ])
-          // Limpiar el monto pendiente después de stake
+          // Limpiar el monto pendiente después de stake y desactivar el loading
           setPendingStakeAmount(null)
+          setIsLoading(false)
         }
       } catch (error) {
         if (isMounted) {
           console.error('Error during staking (after approval): ', error)
+          setIsLoading(false)
         }
       }
     }
@@ -81,6 +84,7 @@ export default function Home() {
       isMounted = false
     }
   }, [isSuccess, receipt, pendingStakeAmount, address, writeContractAsync])
+  
   
 
   const handleStake = async (customAmount?: number, userAddress?: string) => {
@@ -122,14 +126,16 @@ export default function Home() {
 
   const handleChat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    // Activar el loading para evitar múltiples envíos
     setIsLoading(true)
+    let stakeRequired = false
     let messageInput: HTMLInputElement | null = null
+    // let amountToStakeLocal = 0
+  
     try {
       messageInput = (event.target as HTMLFormElement)
         .elements[0] as HTMLInputElement
       const userMessage = messageInput.value
-
+  
       const response = await fetch('https://api.brianknows.org/api/v0/agent', {
         method: 'POST',
         headers: {
@@ -142,24 +148,26 @@ export default function Home() {
           messages: history,
         }),
       })
-
+  
       const data = await response.json()
       console.log('data', { data })
-
+  
       if (data.error?.includes('tokens in your request are not supported')) {
         console.warn(
           'Brian AI does not recognize the token, but we will proceed with staking.'
         )
-
+  
         setHistory((prev) => [
           { content: userMessage, sender: 'user' },
           ...data.conversationHistory,
         ])
-
+  
+        // En este caso se ejecuta el staking, por lo que se debe mantener el loading
+        stakeRequired = true
         await handleStake(data.extractedParams[0].amount, address)
         return
       }
-
+  
       if (!data.result || data.result.length === 0) {
         console.error('Unexpected response from Brian AI:', data)
         setHistory((prev) => [
@@ -169,17 +177,17 @@ export default function Home() {
         ])
         return
       }
-
+  
       const brianResponse = data.result[0]
       console.log('brianResponse', brianResponse)
       let action = brianResponse.action || ''
       const amountToStake = parseFloat(brianResponse.amount) || 0
       const chain = '43113'
-
+  
       if (action === 'deposit') {
         action = STAKING_FUNCTION_NAME
       }
-
+  
       const answer =
         brianResponse.answer ||
         `Staking ${amountToStake} AIVT on Avalanche Fuji (43113).`
@@ -188,13 +196,16 @@ export default function Home() {
         { content: userMessage, sender: 'user' },
         { content: answer, sender: 'brian' },
       ])
-
+  
       if (action === STAKING_FUNCTION_NAME && amountToStake > 0 && address) {
         console.log(
           `Staking ${amountToStake} AIVT on network ${chain} from address ${address}`
         )
+        stakeRequired = true
         setAmount(amountToStake)
         await handleStake(amountToStake, address)
+        // No se desactiva isLoading aquí; se espera a que useEffect lo haga
+        return
       }
     } catch (error) {
       console.error('Error in chat:', error)
@@ -204,10 +215,13 @@ export default function Home() {
       ])
     } finally {
       if (messageInput) messageInput.value = ''
-      // Desactivar el loading una vez se haya completado el proceso
-      setIsLoading(false)
+      // Solo se desactiva el loading aquí si no se requiere stake (es decir, la transacción ya terminó)
+      if (!stakeRequired) {
+        setIsLoading(false)
+      }
     }
   }
+  
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-800">
@@ -218,7 +232,7 @@ export default function Home() {
         </div>
 
         <div className="overflow-y-auto rounded-sm h-full mt-8">
-          <div className="flex flex-col space-y-4 p-4 overflow-y-auto h-96">
+          <div className="flex flex-col space-y-4 p-4 overflow-y-auto h-full">
             {history.map((el) => {
               const isBot = el.sender === 'brian'
               return (
@@ -237,7 +251,7 @@ export default function Home() {
                     className={`rounded-lg p-3 max-w-xs break-words ${
                       isBot
                         ? 'bg-gray-100 text-gray-900'
-                        : 'bg-red-500 text-white'
+                        : 'bg-red-300 text-gray-900'
                     }`}
                   >
                     <ReactMarkdown>{el.content}</ReactMarkdown>
@@ -269,7 +283,7 @@ export default function Home() {
             disabled={isLoading}
             className="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-md"
           >
-            {isLoading ? 'Enviando...' : 'Send'}
+            {isLoading ? 'transacting...' : 'send'}
           </button>
         </form>
       </div>
