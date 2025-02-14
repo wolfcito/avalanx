@@ -275,6 +275,10 @@ export default function Home() {
           }
 
           if (action === WITHDRAW_FUNCTION_NAME) {
+            setHistory((prev) => [
+              ...prev,
+              { content: userMessage, sender: 'user' },
+            ])
             await handleRetiro()
             return
           }
@@ -293,6 +297,10 @@ export default function Home() {
           }
 
           if (action === CLAIM_FUNCTION_NAME) {
+            setHistory((prev) => [
+              ...prev,
+              { content: userMessage, sender: 'user' },
+            ])
             await handleCobroT()
             return
           }
@@ -466,10 +474,10 @@ export default function Home() {
           <button
             type="submit"
             disabled={isLoading}
-            className={clsx(
-              'bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-md',
-              { 'cursor-not-allowed bg-gray-500': isLoading }
-            )}
+            className={clsx('text-white px-4 py-2 rounded-md', {
+              'cursor-not-allowed bg-gray-500': isLoading,
+              'bg-red-500 hover:bg-red-700': !isLoading,
+            })}
           >
             {isLoading ? 'working...' : 'send'}
           </button>
