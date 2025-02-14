@@ -1,4 +1,4 @@
-import { FormEvent, useState, useEffect } from 'react'
+import { FormEvent, useState, useEffect, useRef } from 'react'
 import {
   useAccount,
   useWriteContract,
@@ -30,6 +30,7 @@ export default function Home() {
   const [amount, setAmount] = useState(0)
   const { address } = useAccount()
   const { writeContractAsync } = useWriteContract()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const [isLoading, setIsLoading] = useState(false)
   const [txApproveHash, setTxApproveHash] = useState<`0x${string}` | null>(null)
@@ -44,6 +45,10 @@ export default function Home() {
     hash: txApproveHash ?? '0x',
     confirmations: 2,
   })
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [history])
 
   useEffect(() => {
     let isMounted = true
@@ -435,6 +440,7 @@ export default function Home() {
                 </div>
               )
             })}
+            <div ref={messagesEndRef} />
           </div>
         </div>
 
