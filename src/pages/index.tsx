@@ -20,7 +20,9 @@ dotenv.config()
 
 const AI_AGENT_API = process.env.NEXT_PUBLIC_AI_AGENT_API as string
 const STAKING_AVAX_FUNCTION_NAME = 'AddAvax'
-const STAKING_FUNCTION_NAME = 'AddToken'
+const STAKING_AIVT_FUNCTION_NAME = 'AddToken'
+const WITHDRAW_FUNCTION_NAME = 'Retiro'
+const CLAIM_FUNCTION_NAME = 'CobroT'
 const TOKEN_DECIMALS = 18
 
 export default function Home() {
@@ -51,7 +53,7 @@ export default function Home() {
         const txStake = await writeContractAsync({
           abi: STAKING_ABI,
           address: STAKING_CONTRACT as `0x${string}`,
-          functionName: STAKING_FUNCTION_NAME,
+          functionName: STAKING_AIVT_FUNCTION_NAME,
           args: [pendingStakeAmountUnits!],
         })
 
@@ -139,6 +141,52 @@ export default function Home() {
     }
   }
 
+  const handleRetiro = async () => {
+    setIsLoading(true)
+    try {
+      const txRetiro = await writeContractAsync({
+        abi: STAKING_ABI,
+        address: STAKING_CONTRACT as `0x${string}`,
+        functionName: WITHDRAW_FUNCTION_NAME,
+        args: [],
+      })
+      console.log(`Retiro exitoso, tx: ${txRetiro}`)
+      setHistory((prev) => [
+        ...prev,
+        { content: `Retiro exitoso, tx hash: ${txRetiro}`, sender: 'brian' },
+      ])
+    } catch (error) {
+      const errorMsg = `Error during Retiro: ${error}`
+      console.error(errorMsg)
+      setHistory((prev) => [...prev, { content: errorMsg, sender: 'brian' }])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCobroT = async () => {
+    setIsLoading(true)
+    try {
+      const txCobroT = await writeContractAsync({
+        abi: STAKING_ABI,
+        address: STAKING_CONTRACT as `0x${string}`,
+        functionName: CLAIM_FUNCTION_NAME,
+        args: [],
+      })
+      console.log(`CobroT exitoso, tx: ${txCobroT}`)
+      setHistory((prev) => [
+        ...prev,
+        { content: `CobroT exitoso, tx: ${txCobroT}`, sender: 'brian' },
+      ])
+    } catch (error) {
+      const errorMsg = `Error during CobroT: ${error}`
+      console.error(errorMsg)
+      setHistory((prev) => [...prev, { content: errorMsg, sender: 'brian' }])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleChat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setIsLoading(true)
@@ -157,7 +205,7 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: `${userMessage} on avalanche`,
+          prompt: `${userMessage} on Avalanche C-Chain`,
           address: address,
           messages: history,
         }),
@@ -173,7 +221,7 @@ export default function Home() {
           )
         ) {
           console.warn(
-            'Brian AI does not recognize the token, but we will proceed with staking.'
+            'Avalanx does not recognize the token, but we will proceed with staking.'
           )
 
           const brianResponse = data.extractedParams[0]
@@ -185,10 +233,10 @@ export default function Home() {
             action === 'deposit' &&
             brianResponse.token1.toUpperCase() === 'AIVT'
           ) {
-            action = STAKING_FUNCTION_NAME
+            action = STAKING_AIVT_FUNCTION_NAME
           }
 
-          if (action === STAKING_FUNCTION_NAME) {
+          if (action === STAKING_AIVT_FUNCTION_NAME) {
             const answer =
               brianResponse.answer ||
               `Staking ${amountToStake} ${brianResponse.token1} on ${brianResponse.chain}.`
@@ -200,7 +248,7 @@ export default function Home() {
           }
 
           if (
-            action === STAKING_FUNCTION_NAME &&
+            action === STAKING_AIVT_FUNCTION_NAME &&
             amountToStake > 0 &&
             address
           ) {
@@ -210,6 +258,42 @@ export default function Home() {
             stakeRequired = true
             setAmount(amountToStake)
             await handleStake(amountToStake, address)
+            return
+          }
+        }
+        if (String(data.error).includes('withdraw')) {
+          console.warn(
+            'Avalanx does not recognize the token, but we will proceed with staking.'
+          )
+
+          const brianResponse = data.extractedParams[0]
+          console.log('brianResponse', brianResponse)
+          let action = brianResponse.action || ''
+
+          if (action === 'withdraw') {
+            action = WITHDRAW_FUNCTION_NAME
+          }
+
+          if (action === WITHDRAW_FUNCTION_NAME) {
+            await handleRetiro()
+            return
+          }
+        }
+        if (String(data.error).includes('claim')) {
+          console.warn(
+            'Avalanx does not recognize the token, but we will proceed with staking.'
+          )
+
+          const brianResponse = data.extractedParams[0]
+          console.log('brianResponse', brianResponse)
+          let action = brianResponse.action || ''
+
+          if (action === 'claim') {
+            action = CLAIM_FUNCTION_NAME
+          }
+
+          if (action === CLAIM_FUNCTION_NAME) {
+            await handleCobroT()
             return
           }
         }
@@ -301,8 +385,8 @@ export default function Home() {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-800">
-      <div className="bg-white shadow-md rounded-md w-full max-w-md h-screen p-4 flex flex-col">
+    <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-800 text-sm">
+      <div className="bg-white shadow-md rounded-md w-full max-w-xl h-screen p-4 flex flex-col">
         <div className="flex justify-end pb-8 bg-white/30 backdrop-blur-md w-full pt-4">
           <div>What's Avalanx</div>
           <CustomConnectButton />
@@ -346,9 +430,33 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Sección para botones de Retiro y CobroT */}
+        {/* <div className="flex space-x-2 mt-4">
+          <button
+            onClick={handleRetiro}
+            disabled={isLoading}
+            className={clsx(
+              'bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded-md',
+              { 'cursor-not-allowed bg-gray-500': isLoading }
+            )}
+          >
+            Retiro
+          </button>
+          <button
+            onClick={handleCobroT}
+            disabled={isLoading}
+            className={clsx(
+              'bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded-md',
+              { 'cursor-not-allowed bg-gray-500': isLoading }
+            )}
+          >
+            CobroT
+          </button>
+        </div> */}
+
         <form
           onSubmit={handleChat}
-          className="w-full flex items-center space-x-2 p-2 bg-white"
+          className="w-full flex items-center space-x-2 p-2 bg-white mt-4"
         >
           <input
             type="text"
