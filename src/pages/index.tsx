@@ -15,6 +15,7 @@ import dotenv from 'dotenv'
 import ReactMarkdown from 'react-markdown'
 import { CustomConnectButton } from '@/src/components'
 import clsx from 'clsx'
+import { ArrowUp } from 'lucide-react'
 
 dotenv.config()
 
@@ -32,6 +33,7 @@ export default function Home() {
   const { writeContractAsync } = useWriteContract()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  const [chatInput, setChatInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [txApproveHash, setTxApproveHash] = useState<`0x${string}` | null>(null)
   const [pendingStakeAmountDisplay, setPendingStakeAmountDisplay] = useState<
@@ -196,12 +198,9 @@ export default function Home() {
     event.preventDefault()
     setIsLoading(true)
     let stakeRequired = false
-    let messageInput: HTMLInputElement | null = null
 
     try {
-      messageInput = (event.target as HTMLFormElement)
-        .elements[0] as HTMLInputElement
-      const userMessage = messageInput.value
+      const userMessage = chatInput
 
       const response = await fetch(AI_AGENT_API, {
         method: 'POST',
@@ -390,7 +389,7 @@ export default function Home() {
         { content: 'Your request could not be processed', sender: 'brian' },
       ])
     } finally {
-      if (messageInput) messageInput.value = ''
+      setChatInput('')
       if (!stakeRequired) {
         setIsLoading(false)
       }
@@ -398,10 +397,13 @@ export default function Home() {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-800 text-sm">
-      <div className="bg-white shadow-md rounded-md w-full max-w-xl h-screen p-4 flex flex-col">
+    <main className="flex flex-col items-center justify-center min-h-screen text-gray-800 text-sm">
+      <div className="bg-white rounded-md w-full max-w-2xl h-screen p-4 flex flex-col">
         <div className="flex justify-end pb-8 bg-white/30 backdrop-blur-md w-full pt-4">
-          <div>What's Avalanx</div>
+          <div className="flex items-center font-bold flex-1 text-lg font-macondo">
+            Your friend{' '}
+            <div className="ml-2 text-red-500 font-bold">Avalanx</div>
+          </div>
           <CustomConnectButton />
         </div>
 
@@ -444,49 +446,68 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Sección para botones de Retiro y CobroT */}
-        {/* <div className="flex space-x-2 mt-4">
-          <button
-            onClick={handleRetiro}
-            disabled={isLoading}
-            className={clsx(
-              'bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded-md',
-              { 'cursor-not-allowed bg-gray-500': isLoading }
-            )}
-          >
-            Retiro
-          </button>
-          <button
-            onClick={handleCobroT}
-            disabled={isLoading}
-            className={clsx(
-              'bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded-md',
-              { 'cursor-not-allowed bg-gray-500': isLoading }
-            )}
-          >
-            CobroT
-          </button>
-        </div> */}
-
         <form
           onSubmit={handleChat}
-          className="w-full flex items-center space-x-2 p-2 bg-white mt-4"
+          className="flex flex-col space-y-2 bg-gray-100 p-4 rounded-3xl"
         >
-          <input
-            type="text"
-            placeholder="Ask Avalanx"
-            className="flex-1 border border-gray-300 rounded-md p-2"
-          />
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={clsx('text-white px-4 py-2 rounded-md', {
-              'cursor-not-allowed bg-gray-500': isLoading,
-              'bg-red-500 hover:bg-red-700': !isLoading,
-            })}
-          >
-            {isLoading ? 'working...' : 'send'}
-          </button>
+          <div className="w-full flex items-center space-x-2 p-2">
+            <input
+              type="text"
+              placeholder="Hey! How can I help you out today, buddy? 😊"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              className="flex-1 rounded-md p-2 outline-none"
+            />
+          </div>
+          <div className="flex space-x-4 mt-1">
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setChatInput('Staking 1 AVAX')}
+              className="inline-flex items-center rounded-full bg-red-50 px-2 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset cursor-pointer"
+            >
+              Staking 1 AVAX
+            </button>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setChatInput('Staking 10000 AIVT')}
+              className="inline-flex items-center rounded-full bg-red-50 px-2 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset cursor-pointer"
+            >
+              Staking 10000 AIVT
+            </button>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setChatInput('Claim rewards')}
+              className="inline-flex items-center rounded-full bg-red-50 px-2 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset cursor-pointer"
+            >
+              Claim rewards
+            </button>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setChatInput('Withdraw funds')}
+              className="inline-flex items-center rounded-full bg-red-50 px-2 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset cursor-pointer"
+            >
+              Withdraw funds
+            </button>
+            <div className="flex flex-1 justify-end">
+              <button
+                type="submit"
+                disabled={isLoading || !chatInput.trim()}
+                className={clsx('text-white px-2 py-2 rounded-full', {
+                  'bg-gray-500': isLoading,
+                  'bg-red-500 hover:bg-red-700 cursor-pointer': !isLoading,
+                })}
+              >
+                {isLoading ? 'thinking...' : <ArrowUp size={24} />}
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     </main>
