@@ -29,10 +29,10 @@ export function TeamComponent({
   readonly setIsModalOpen: any
 }) {
   return (
-    <section className="py-8flex">
+    <section className="py-8 flex">
       <div className="container mx-auto px-4 text-center w-full max-w-2xl">
         <button
-          className="absolute top-2 right-2 text-gray-600 hover:text-gray-900 bg-gray-100 py-2 px-3 rounded-full cursor-pointer"
+          className="absolute top-2 right-2 py-2 px-3 rounded-full cursor-pointer"
           onClick={() => setIsModalOpen(false)}
         >
           ✕
@@ -50,7 +50,7 @@ export function TeamComponent({
             </div>
           ))}
         </div>
-        <p className="mt-8 text-lg text-gray-700">
+        <p className="mt-8 text-lg">
           We are transforming the complex into something simple, opening the
           doors to the world and the Web3 community.
         </p>

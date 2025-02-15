@@ -14,7 +14,6 @@ export function CustomConnectButton() {
         const isReady = mounted
         const isConnected = isReady && account && chain
 
-        // Mientras el componente se carga, se muestra un estado "loading"
         if (!isReady) {
           return (
             <div
@@ -26,31 +25,28 @@ export function CustomConnectButton() {
           )
         }
 
-        // Si no está conectado, se muestra el botón de conexión
         if (!isConnected) {
           return (
             <button
               onClick={openConnectModal}
-              className="bg-red-500 hover:bg-red-700 text-white py-1 px-4 rounded-sm w-full cursor-pointer"
+              className="bg-red-500 hover:bg-red-700 text-white py-1 px-4 rounded-sm cursor-pointer"
             >
               Connect Wallet
             </button>
           )
         }
 
-        // Si la red es incorrecta, se muestra el aviso correspondiente
         if (chain.unsupported) {
           return (
             <button
               onClick={openChainModal}
-              className="bg-red-500 hover:bg-red-700 text-white py-1 px-4 rounded-sm w-full cursor-pointer"
+              className="bg-red-500 hover:bg-red-700 text-white py-1 px-4 rounded-sm cursor-pointer"
             >
               Wrong Network
             </button>
           )
         }
 
-        // Si está conectado y la red es la correcta, se muestran las opciones de la cuenta
         return (
           <div className="flex items-center space-x-3">
             <button
@@ -66,7 +62,7 @@ export function CustomConnectButton() {
             </button>
             <button
               onClick={openAccountModal}
-              className="bg-gray-100 text-gray-800 px-3 py-1 rounded cursor-pointer"
+              className="bg-gray-100 text-gray-800 dark:bg-[#333] dark:text-gray-100 px-3 py-1 rounded cursor-pointer"
               aria-label="Account details"
             >
               {account.displayName}

@@ -13,10 +13,11 @@ import {
 import { nanoid } from 'nanoid'
 import dotenv from 'dotenv'
 import ReactMarkdown from 'react-markdown'
-import { CustomConnectButton } from '@/src/components'
 import clsx from 'clsx'
 import { ArrowUp, Gem } from 'lucide-react'
 import { TeamComponent } from '../components/team'
+import { ThemeToggle } from '../components/toogle'
+import { CustomConnectButton } from '../components/connect'
 
 dotenv.config()
 
@@ -401,9 +402,9 @@ export default function Home() {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen text-gray-800 text-sm">
-      <div className="bg-white rounded-md w-full max-w-2xl h-screen p-4 flex flex-col">
-        <div className="flex justify-end pb-8 bg-white/30 backdrop-blur-md w-full pt-4">
+    <main className="flex flex-col items-center justify-center min-h-screen text-gray-800 text-sm dark:bg-[#181818] dark:text-white">
+      <div className="bg-white w-full max-w-2xl h-screen p-4 flex flex-col dark:bg-[#181818] dark:text-white">
+        <div className="flex justify-end pb-8 backdrop-blur-md w-full pt-4 space-x-1">
           <div className="flex items-center font-bold flex-1 text-lg font-macondo">
             Your friend{' '}
             <div className="ml-2 text-red-500 font-bold">Avalanx</div>
@@ -414,19 +415,20 @@ export default function Home() {
           >
             <Gem size={24} />
           </button>
+          <ThemeToggle />
           <CustomConnectButton />
         </div>
 
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg p-6 relative max-w-lg w-full">
+            <div className="bg-white dark:bg-[#333] dark:text-white rounded-lg p-6 relative max-w-lg w-full">
               <TeamComponent setIsModalOpen={setIsModalOpen} />
             </div>
           </div>
         )}
 
         <div className="overflow-y-auto rounded-sm h-full mt-8">
-          <div className="flex flex-col space-y-4 p-4 overflow-y-auto h-full">
+          <div className="flex flex-col space-y-4 py-4 overflow-y-auto h-full">
             {history.map((el) => {
               const isBot = el.sender === 'brian'
               return (
@@ -444,7 +446,7 @@ export default function Home() {
                   <div
                     className={`rounded-lg p-3 max-w-xs break-words ${
                       isBot
-                        ? 'bg-gray-100 text-gray-900'
+                        ? 'bg-gray-100 dark:bg-[#333] dark:text-white text-gray-900'
                         : 'bg-red-200 text-gray-900'
                     }`}
                   >
@@ -466,9 +468,9 @@ export default function Home() {
 
         <form
           onSubmit={handleChat}
-          className="flex flex-col space-y-2 bg-gray-100 p-4 rounded-3xl"
+          className="flex flex-col space-y-2 bg-gray-100 p-4 rounded-3xl dark:bg-[#333] dark:text-white"
         >
-          <div className="w-full flex items-center space-x-2 p-2">
+          <div className="w-full flex items-center space-x-2 py-2">
             <input
               type="text"
               placeholder="Hey! How can I help you out today, buddy? 😊"
@@ -476,13 +478,23 @@ export default function Home() {
               onChange={(e) => setChatInput(e.target.value)}
               className="flex-1 rounded-md p-2 outline-none"
             />
+            <button
+              type="submit"
+              disabled={isLoading || !chatInput.trim()}
+              className={clsx('text-white px-2 py-2 rounded-md', {
+                'bg-gray-500': isLoading,
+                'bg-red-500 hover:bg-red-700 cursor-pointer': !isLoading,
+              })}
+            >
+              {isLoading ? 'thinking...' : <ArrowUp size={24} />}
+            </button>
           </div>
           <div className="flex space-x-4 mt-1">
             <button
               type="button"
               disabled={isLoading}
               onClick={() => setChatInput('Staking 1 AVAX')}
-              className="inline-flex items-center rounded-full bg-red-50 px-2 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset cursor-pointer"
+              className="inline-flex items-center rounded-md bg-gray-50 dark:bg-[#333] dark:text-white p-2 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 dark:ring-white/10 ring-inset cursor-pointer"
             >
               Staking 1 AVAX
             </button>
@@ -491,7 +503,7 @@ export default function Home() {
               type="button"
               disabled={isLoading}
               onClick={() => setChatInput('Staking 10000 AIVT')}
-              className="inline-flex items-center rounded-full bg-red-50 px-2 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset cursor-pointer"
+              className="inline-flex items-center rounded-md bg-gray-50 dark:bg-[#333] dark:text-white p-2 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 dark:ring-white/10 ring-inset cursor-pointer"
             >
               Staking 10000 AIVT
             </button>
@@ -500,7 +512,7 @@ export default function Home() {
               type="button"
               disabled={isLoading}
               onClick={() => setChatInput('Claim rewards')}
-              className="inline-flex items-center rounded-full bg-red-50 px-2 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset cursor-pointer"
+              className="inline-flex items-center rounded-md bg-gray-50 dark:bg-[#333] dark:text-white p-2 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 dark:ring-white/10 ring-inset cursor-pointer"
             >
               Claim rewards
             </button>
@@ -509,22 +521,10 @@ export default function Home() {
               type="button"
               disabled={isLoading}
               onClick={() => setChatInput('Withdraw funds')}
-              className="inline-flex items-center rounded-full bg-red-50 px-2 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset cursor-pointer"
+              className="inline-flex items-center rounded-md bg-gray-50 dark:bg-[#333] dark:text-white p-2 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 dark:ring-white/10 ring-inset cursor-pointer"
             >
               Withdraw funds
             </button>
-            <div className="flex flex-1 justify-end">
-              <button
-                type="submit"
-                disabled={isLoading || !chatInput.trim()}
-                className={clsx('text-white px-2 py-2 rounded-full', {
-                  'bg-gray-500': isLoading,
-                  'bg-red-500 hover:bg-red-700 cursor-pointer': !isLoading,
-                })}
-              >
-                {isLoading ? 'thinking...' : <ArrowUp size={24} />}
-              </button>
-            </div>
           </div>
         </form>
       </div>
