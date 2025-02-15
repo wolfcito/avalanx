@@ -15,7 +15,8 @@ import dotenv from 'dotenv'
 import ReactMarkdown from 'react-markdown'
 import { CustomConnectButton } from '@/src/components'
 import clsx from 'clsx'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp, Gem } from 'lucide-react'
+import { TeamComponent } from '../components/team'
 
 dotenv.config()
 
@@ -42,6 +43,9 @@ export default function Home() {
   const [pendingStakeAmountUnits, setPendingStakeAmountUnits] = useState<
     bigint | null
   >(null)
+
+  // Estado para el modal del team
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const { data: receipt, isSuccess } = useWaitForTransactionReceipt({
     hash: txApproveHash ?? '0x',
@@ -404,8 +408,22 @@ export default function Home() {
             Your friend{' '}
             <div className="ml-2 text-red-500 font-bold">Avalanx</div>
           </div>
+          <button
+            className="mx-2 cursor-pointer"
+            onClick={() => setIsModalOpen(true)}
+          >
+            <Gem size={24} />
+          </button>
           <CustomConnectButton />
         </div>
+
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-lg p-6 relative max-w-lg w-full">
+              <TeamComponent setIsModalOpen={setIsModalOpen} />
+            </div>
+          </div>
+        )}
 
         <div className="overflow-y-auto rounded-sm h-full mt-8">
           <div className="flex flex-col space-y-4 p-4 overflow-y-auto h-full">
